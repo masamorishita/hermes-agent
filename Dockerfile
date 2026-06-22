@@ -327,4 +327,13 @@ RUN mkdir -p /opt/data
 # exit code. Without the wrapper-as-ENTRYPOINT, leading-dash args
 # like `--version` would be intercepted by /init's POSIX shell.
 ENTRYPOINT [ "/init", "/opt/hermes/docker/main-wrapper.sh" ]
-CMD [ ]
+# NOTE (railway branch): default the container to the headless gateway daemon.
+# `gateway run` under s6 (PID 1) is redirected to a supervised s6 longrun
+# (auto-restart on crash) while this CMD process stays alive as a `sleep
+# infinity` heartbeat — see _maybe_redirect_run_to_s6_supervision() in
+# hermes_cli/gateway.py. This keeps the container up on Railway (no TTY, so the
+# default interactive `chat` would exit immediately). IMPORTANT: do NOT set a
+# Railway "Custom Start Command" — that bypasses this ENTRYPOINT/init and the
+# bare `gateway run` fails (gateway is a hermes subcommand, not an executable).
+# (BIZ-45)
+CMD [ "gateway", "run" ]
