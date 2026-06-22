@@ -298,7 +298,11 @@ COPY --chmod=0755 docker/hermes-exec-shim.sh /opt/hermes/bin/hermes
 # every other consumer.
 ENV PATH="/opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:${PATH}"
 RUN mkdir -p /opt/data
-VOLUME [ "/opt/data" ]
+# NOTE (railway branch): the Docker `VOLUME [ "/opt/data" ]` instruction is
+# removed here because Railway's builder rejects Dockerfile VOLUME directives
+# ("use Railway Volumes"). Persistence is provided by a Railway Volume mounted
+# at /opt/data (== HERMES_HOME), so the runtime layout is identical. This is
+# the only delta from main; keep main pristine for upstream tracking. (BIZ-45)
 
 # s6-overlay's /init is PID 1. It sets up the supervision tree, runs
 # /etc/cont-init.d/* (our stage2 hook), starts s6-rc services
