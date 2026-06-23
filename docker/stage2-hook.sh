@@ -366,6 +366,19 @@ if [ ! -f "$HERMES_HOME/auth.json" ] && [ -n "${HERMES_AUTH_JSON_BOOTSTRAP:-}" ]
     chmod 600 "$HERMES_HOME/auth.json"
 fi
 
+# gbrain config.json: bootstrap from env on first boot only (railway branch,
+# BIZ-43). The bundled gbrain CLI reads its DB URL + ZeroEntropy/OpenAI keys
+# from $HOME/.gbrain/config.json; at runtime HOME=$HERMES_HOME=/opt/data, so
+# the GBrain client layer looks at /opt/data/.gbrain/config.json. Same
+# first-boot-only [ ! -f ] semantics as auth.json so we never clobber a config
+# the operator edited on the volume.
+if [ ! -f "$HERMES_HOME/.gbrain/config.json" ] && [ -n "${GBRAIN_CONFIG_JSON_BOOTSTRAP:-}" ]; then
+    mkdir -p "$HERMES_HOME/.gbrain"
+    printf '%s' "$GBRAIN_CONFIG_JSON_BOOTSTRAP" > "$HERMES_HOME/.gbrain/config.json"
+    chown -R hermes:hermes "$HERMES_HOME/.gbrain" 2>/dev/null || true
+    chmod 600 "$HERMES_HOME/.gbrain/config.json"
+fi
+
 # gateway_state.json: declare the gateway's INITIAL supervised state on a
 # fresh volume. Same first-boot-only env-seed pattern as auth.json above.
 #

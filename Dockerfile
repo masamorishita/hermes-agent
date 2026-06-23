@@ -7,6 +7,11 @@ FROM ghcr.io/astral-sh/uv:0.11.6-python3.13-trixie@sha256:b3c543b6c4f23a5f2df228
 # our Debian 13 (trixie, glibc 2.41) runtime.  Bumping to a new Node major
 # is a one-line ARG change; see #4977.
 FROM node:22-bookworm-slim@sha256:7af03b14a13c8cdd38e45058fd957bf00a72bbe17feac43b1c15a689c029c732 AS node_source
+# Bun runtime source stage (railway branch, BIZ-43). Pinned to the ssh-air
+# host's known-good bun 1.0.36 so the gbrain CLI behaves identically in the
+# cloud. oven/bun's debian (bookworm) base links glibc 2.36, which runs
+# cleanly on the Debian 13 (trixie) runtime below — same rationale as node.
+FROM oven/bun:1.0.36 AS bun_source
 FROM debian:13.4
 
 # Disable Python stdout buffering to ensure logs are printed immediately
@@ -101,6 +106,23 @@ COPY --from=node_source /usr/local/lib/node_modules/corepack /usr/local/lib/node
 RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
     ln -sf /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
+
+# ---------- Bun + gbrain (GBrain MCP integration) — railway branch, BIZ-43 ----------
+# gbrain is a Bun-native CLI (npm package `gbrain`) that Hermes spawns as an MCP
+# server (`gbrain serve`, via scripts/gbrain-mcp-stdio-wrapper.py). Bundle a
+# pinned Bun runtime + gbrain so the cloud container runs the same GBrain client
+# layer as the ssh-air host. Versions pinned to air's known-good combo (bun
+# 1.0.36 / gbrain 0.42.52.0). Installed under /opt/bun (a fixed image path, NOT
+# a home dir) so it survives the /opt/data volume overlay and any runtime HOME.
+# GBRAIN_BIN points the wrapper at this binary; gbrain reads its DB/ZeroEntropy
+# config from $HOME/.gbrain/config.json (=/opt/data/.gbrain/config.json at
+# runtime), seeded separately. This block is placed before COPY . . so it stays
+# layer-cached across source-only changes.
+COPY --from=bun_source /usr/local/bin/bun /usr/local/bin/bun
+ENV BUN_INSTALL=/opt/bun
+RUN bun install -g gbrain@0.42.52.0 && test -x /opt/bun/bin/gbrain
+ENV PATH="/opt/bun/bin:${PATH}"
+ENV GBRAIN_BIN=/opt/bun/bin/gbrain
 
 WORKDIR /opt/hermes
 
