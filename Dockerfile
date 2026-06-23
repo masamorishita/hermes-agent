@@ -108,19 +108,27 @@ RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && 
     ln -sf /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 # ---------- Bun + gbrain (GBrain MCP integration) — railway branch, BIZ-43 ----------
-# gbrain is a Bun-native CLI (npm package `gbrain`) that Hermes spawns as an MCP
-# server (`gbrain serve`, via scripts/gbrain-mcp-stdio-wrapper.py). Bundle a
-# pinned Bun runtime + gbrain so the cloud container runs the same GBrain client
-# layer as the ssh-air host. Versions pinned to air's known-good combo (bun
-# 1.0.36 / gbrain 0.42.52.0). Installed under /opt/bun (a fixed image path, NOT
-# a home dir) so it survives the /opt/data volume overlay and any runtime HOME.
-# GBRAIN_BIN points the wrapper at this binary; gbrain reads its DB/ZeroEntropy
-# config from $HOME/.gbrain/config.json (=/opt/data/.gbrain/config.json at
-# runtime), seeded separately. This block is placed before COPY . . so it stays
-# layer-cached across source-only changes.
+# gbrain here is the garrytan/gbrain GIT project (NOT the unrelated npm package
+# of the same name) — the same source the ssh-air host installs via
+# `bun add -g <checkout>`. Hermes spawns it as an MCP server (`gbrain serve`,
+# via scripts/gbrain-mcp-stdio-wrapper.py). Bundle a pinned Bun runtime + a
+# pinned gbrain checkout so the cloud container runs the same GBrain client
+# layer as air (bun 1.0.36 / gbrain SHA below). Installed under /opt/bun +
+# /opt/gbrain (fixed image paths, NOT a home dir) so they survive the /opt/data
+# volume overlay and any runtime HOME. GBRAIN_BIN points the wrapper at the
+# global bin; gbrain reads its DB/ZeroEntropy/OpenAI config from
+# $HOME/.gbrain/config.json (=/opt/data/.gbrain/config.json at runtime), seeded
+# by stage2-hook from GBRAIN_CONFIG_JSON_BOOTSTRAP. Placed before COPY . . so it
+# stays layer-cached across source-only changes.
 COPY --from=bun_source /usr/local/bin/bun /usr/local/bin/bun
 ENV BUN_INSTALL=/opt/bun
-RUN bun install -g gbrain@0.42.52.0 && test -x /opt/bun/bin/gbrain
+ARG GBRAIN_GIT_SHA=bb2e88c42a4969e16df7a43a9eb118aa031e89a4
+RUN git clone --filter=blob:none --no-checkout https://github.com/garrytan/gbrain.git /opt/gbrain && \
+    git -C /opt/gbrain checkout "${GBRAIN_GIT_SHA}"
+COPY docker/gbrain-clone-patch.py /tmp/gbrain-clone-patch.py
+RUN python3 /tmp/gbrain-clone-patch.py /opt/gbrain/src/core/ai/gateway.ts && \
+    cd /opt/gbrain && bun install && \
+    bun add -g /opt/gbrain && test -x /opt/bun/bin/gbrain
 ENV PATH="/opt/bun/bin:${PATH}"
 ENV GBRAIN_BIN=/opt/bun/bin/gbrain
 
