@@ -38,6 +38,16 @@ if _SCRIPTS_DIR not in sys.path:
 
 from _hermes_home import get_hermes_home
 
+# Optional service-account (Domain-Wide Delegation) auth backend. Active only
+# when env GOOGLE_AUTH_MODE=service_account; otherwise the OAuth path below is
+# used unchanged. Lets Hermes use Google headlessly (no browser, no refresh-
+# token expiry) by fetching the SA key from Infisical and impersonating a
+# Workspace user. See sa_auth.py.
+try:
+    import sa_auth
+except Exception:
+    sa_auth = None
+
 HERMES_HOME = get_hermes_home()
 TOKEN_PATH = HERMES_HOME / "google_token.json"
 CLIENT_SECRET_PATH = HERMES_HOME / "google_client_secret.json"
@@ -62,6 +72,8 @@ def _normalize_authorized_user_payload(payload: dict) -> dict:
 
 
 def _ensure_authenticated():
+    if sa_auth and sa_auth.sa_mode():
+        return  # service-account mode: no OAuth token file needed
     if not TOKEN_PATH.exists():
         print("Not authenticated. Run the setup script first:", file=sys.stderr)
         print(f"  python {Path(__file__).parent / 'setup.py'}", file=sys.stderr)
@@ -80,6 +92,8 @@ def _stored_token_scopes() -> list[str]:
 
 
 def _gws_binary() -> str | None:
+    if sa_auth and sa_auth.sa_mode():
+        return None  # gws CLI needs an OAuth token; force the Python client path
     override = os.getenv("HERMES_GWS_BIN")
     if override:
         return override
@@ -180,6 +194,9 @@ def _datetime_with_timezone(value: str) -> str:
 
 def get_credentials():
     """Load and refresh credentials from token file."""
+    if sa_auth and sa_auth.sa_mode():
+        return sa_auth.credentials()  # service-account + DWD impersonation
+
     _ensure_authenticated()
 
     from google.oauth2.credentials import Credentials

@@ -5,11 +5,12 @@ version: 1.1.0
 author: Nous Research
 license: MIT
 platforms: [linux, macos, windows]
-required_credential_files:
-  - path: google_token.json
-    description: Google OAuth2 token (created by setup script)
-  - path: google_client_secret.json
-    description: Google OAuth2 client credentials (downloaded from Google Cloud Console)
+# Credentials are supplied at runtime by one of two backends, so no static
+# credential files are required (declaring them would mark the skill
+# SETUP_NEEDED on hosts that use the service-account backend):
+#   1. service-account + DWD (GOOGLE_AUTH_MODE=service_account) — headless,
+#      key fetched from Infisical in-memory. See scripts/sa_auth.py.
+#   2. OAuth2 user flow — scripts/setup.py writes google_token.json.
 metadata:
   hermes:
     tags: [Google, Gmail, Calendar, Drive, Sheets, Docs, Contacts, Email, OAuth]
@@ -20,6 +21,13 @@ metadata:
 # Google Workspace
 
 Gmail, Calendar, Drive, Contacts, Sheets, and Docs — through Hermes-managed OAuth and a thin CLI wrapper. When `gws` is installed, the skill uses it as the execution backend for broader Google Workspace coverage; otherwise it falls back to the bundled Python client implementation.
+
+## Auth backends
+
+Two ways to authenticate (selected at runtime):
+
+- **Service account + Domain-Wide Delegation** — set `GOOGLE_AUTH_MODE=service_account`. The SA key is fetched from Infisical in-memory and impersonates `DRIVE_IMPERSONATE_SUBJECT` (default `masam@yoursup.co.jp`). Non-interactive: works headless (Railway), no browser, no refresh-token expiry. This forces the Python-client path (the `gws` CLI requires an OAuth token). See `scripts/sa_auth.py` for the required env vars. The SA must be authorized for the needed scopes in Admin console Domain-Wide Delegation.
+- **OAuth2 user flow** — the default when `GOOGLE_AUTH_MODE` is unset. Run `scripts/setup.py` once to authorize; requires a browser and is unsuitable for headless hosts.
 
 ## References
 
