@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "google-api-python-client",
+#     "google-auth",
+#     "google-auth-oauthlib",
+#     "google-auth-httplib2",
+# ]
+# ///
+# NOTE: The PEP 723 block above lets `uv run google_api.py ...` provision the
+# Google client libraries on hosts where the ambient Python lacks them (e.g.
+# Railway sandboxes). The service-account path forces the Python client, so
+# these deps are required there. See SKILL.md for the canonical `uv run`
+# invocation.
 """Google Workspace API CLI for Hermes Agent.
 
 Uses the Google Workspace CLI (`gws`) when available, but preserves the

@@ -174,11 +174,17 @@ Should print `AUTHENTICATED`. Setup is complete — token refreshes automaticall
 
 ## Usage
 
-All commands go through the API script. Set `GAPI` as a shorthand:
+All commands go through the API script. Set `GAPI` as a shorthand. Invoke via
+`uv run` so the Google client libraries are provisioned automatically (declared
+in the script's PEP 723 header) — the ambient `python` on some hosts (e.g.
+Railway sandboxes) lacks `googleapiclient`:
 
 ```bash
-GAPI="python ${HERMES_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/google_api.py"
+GAPI="uv run --no-project ${HERMES_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/google_api.py"
 ```
+
+(If you know the ambient Python already has google-api-python-client + google-auth
+installed, plain `python .../google_api.py` also works.)
 
 ### Gmail
 
